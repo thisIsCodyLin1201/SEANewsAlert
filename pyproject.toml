@@ -1,0 +1,29 @@
+[project]
+name = "seasnews-ai-system"
+version = "1.0.0"
+description = "東南亞金融海外新聞智能搜尋與報告系統"
+requires-python = ">=3.11"
+dependencies = [
+    "agno>=2.0.0",
+    "openai>=1.0.0",
+    "streamlit>=1.32.0",
+    "python-dotenv>=1.0.0",
+    "reportlab>=4.0.0",
+    "markdown>=3.5.0",
+    "weasyprint>=60.0",
+    "aiosmtplib>=3.0.0",
+    "email-validator>=2.1.0",
+    "pillow>=10.0.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "black>=24.0.0",
+    "ruff>=0.3.0",
+]
