@@ -21,7 +21,7 @@ class ResearchAgent:
             model=OpenAIChat(
                 id=Config.OPENAI_MODEL,
                 api_key=Config.OPENAI_API_KEY,
-                max_tokens=2048,
+                # max_tokens=2048,
             ),
             tools=[DuckDuckGoTools()],
             description="專門搜尋和分析東南亞金融市場新聞的研究員",

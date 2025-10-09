@@ -19,7 +19,7 @@ class AnalystAgent:
             model=OpenAIChat(
                 id=Config.OPENAI_MODEL,
                 api_key=Config.OPENAI_API_KEY,
-                max_tokens=4096,  # 增加輸出 token 限制，允許更詳細的報告
+                # max_tokens=4096,  # 增加輸出 token 限制，允許更詳細的報告
             ),
             description="專業的金融新聞分析師，擅長整理和結構化資訊",
             instructions=[
