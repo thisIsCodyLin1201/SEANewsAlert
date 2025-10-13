@@ -6,7 +6,9 @@ from agents import ResearchAgent, AnalystAgent, ReportGeneratorAgent, EmailAgent
 from typing import Dict, Any, Optional
 from pathlib import Path
 import json
+import re
 from datetime import datetime
+from agno.agent import Agent
 from agno.models.openai import OpenAIChat
 from config import Config
 
@@ -19,56 +21,80 @@ class SEANewsWorkflow:
         try:
             self._update_progress(None, "prompt_parsing", "🧠 正在解析您的需求...")
             
-            parser_model = OpenAIChat(
-                id=Config.OPENAI_MODEL,
-                api_key=Config.OPENAI_API_KEY,
-                # max_tokens=512,
-                response_format={'type': 'json_object'}
+            # 使用 Agent 包裝的 OpenAIChat
+            parser_agent = Agent(
+                name="需求解析專家",
+                model=OpenAIChat(
+                    id=Config.OPENAI_MODEL,
+                    api_key=Config.OPENAI_API_KEY
+                ),
+                description="專門解析使用者需求的專家",
+                instructions=[
+                    "你是一個任務解析專家",
+                    "從使用者的需求中提取關鍵資訊",
+                    "你必須只回傳純 JSON 格式，不要有任何其他文字或解釋",
+                    "不要使用 markdown 代碼塊，直接回傳 JSON 物件"
+                ],
+                markdown=False
             )
             
-            system_prompt = """
-            你是一個任務解析專家。請從使用者的需求中，提取出三個關鍵資訊：
-            1. 'keywords': 核心的搜尋主題。
-            2. 'time_instruction': 時間範圍指令，如果沒有指定，預設為嚴格'最近7天內'。
-            3. 'num_instruction': 需要的新聞數量，如果沒有指定，預設為'5-10篇'。
+            prompt = f"""
+            請從以下使用者需求中，提取出四個關鍵資訊：
+            1. 'keywords': 核心的搜尋主題
+            2. 'time_instruction': 時間範圍指令（如果沒有指定，預設為'最近7天內'）
+            3. 'num_instruction': 需要的新聞數量（如果沒有指定，預設為'5-10篇'）
+            4. 'language': 新聞來源的語言（如果沒有指定，預設為'English'。支援：'English', 'Chinese', 'Vietnamese', 'Thai', 'Malay', 'Indonesian'）
 
-            請以 JSON 格式回傳結果。
-            範例需求: "我想找最近一個月內，關於新加坡AI領域的20篇投資趨勢新聞"
-            範例 JSON:
-            {
-                "keywords": "新加坡AI領域的投資趨勢",
-                "time_instruction": "最近一個月內",
-                "num_instruction": "約20篇"
-            }
+            使用者需求：{user_prompt}
+            
+            只回傳 JSON 格式，範例：
+            {{"keywords": "主題", "time_instruction": "時間", "num_instruction": "數量", "language": "English"}}
             """
             
-            response = parser_model.generate(
-                system_prompt=system_prompt,
-                user_prompt=user_prompt
-            )
+            response = parser_agent.run(prompt)
             
             if response and response.content:
-                parsed_data = json.loads(response.content)
+                content = response.content.strip()
+                
+                # 嘗試提取 JSON（處理可能的 markdown 代碼塊）
+                if '```json' in content:
+                    # 提取 ```json ... ``` 之間的內容
+                    import re
+                    json_match = re.search(r'```json\s*(.*?)\s*```', content, re.DOTALL)
+                    if json_match:
+                        content = json_match.group(1)
+                elif '```' in content:
+                    # 提取 ``` ... ``` 之間的內容
+                    import re
+                    json_match = re.search(r'```\s*(.*?)\s*```', content, re.DOTALL)
+                    if json_match:
+                        content = json_match.group(1)
+                
+                # 解析 JSON
+                parsed_data = json.loads(content)
                 keywords = parsed_data.get("keywords", user_prompt)
                 time_instruction = parsed_data.get("time_instruction", "最近7天內")
                 num_instruction = parsed_data.get("num_instruction", "5-10篇")
+                language = parsed_data.get("language", "English")
                 
-                self._update_progress(None, "prompt_parsing", f"✅ 需求解析完成：主題='{keywords}', 時間='{time_instruction}', 數量='{num_instruction}'")
+                self._update_progress(None, "prompt_parsing", f"✅ 需求解析完成：主題='{keywords}', 時間='{time_instruction}', 數量='{num_instruction}', 語言='{language}'")
                 
                 return {
                     "keywords": keywords,
                     "time_instruction": time_instruction,
-                    "num_instruction": num_instruction
+                    "num_instruction": num_instruction,
+                    "language": language
                 }
 
         except Exception as e:
-            self._update_progress(None, "prompt_parsing", f"⚠️ 需求解析失敗，將使用原始輸入進行搜尋。錯誤: {e}")
+            self._update_progress(None, "prompt_parsing", f"⚠️ 需求解析失敗，將使用原始輸入進行搜尋。錯誤: {str(e)}")
         
         # 如果解析失敗，回退到原始輸入
         return {
             "keywords": user_prompt,
             "time_instruction": "最近7天內",
-            "num_instruction": "5-10篇"
+            "num_instruction": "5-10篇",
+            "language": "English"
         }
 
     def __init__(self):
@@ -113,12 +139,13 @@ class SEANewsWorkflow:
             # 解析用戶 Prompt
             parsed_prompt = self._parse_prompt(search_query)
             
-            self._update_progress(callback_func, "step1", f"🔍 正在搜尋關於「{parsed_prompt['keywords']}」的新聞({parsed_prompt['time_instruction']}, {parsed_prompt['num_instruction']})...")
+            self._update_progress(callback_func, "step1", f"🔍 正在搜尋關於「{parsed_prompt['keywords']}」的新聞({parsed_prompt['time_instruction']}, {parsed_prompt['num_instruction']}, {parsed_prompt['language']})...")
             
             search_results = self.research_agent.search(
                 query=parsed_prompt['keywords'],
                 time_instruction=parsed_prompt['time_instruction'],
-                num_instruction=parsed_prompt['num_instruction']
+                num_instruction=parsed_prompt['num_instruction'],
+                language=parsed_prompt['language']
             )
             
             if search_results.get("status") == "error":
