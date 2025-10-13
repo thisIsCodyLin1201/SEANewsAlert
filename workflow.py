@@ -39,15 +39,17 @@ class SEANewsWorkflow:
             )
             
             prompt = f"""
-            請從以下使用者需求中，提取出三個關鍵資訊：
+            請從以下使用者需求中，提取出四個關鍵資訊：
             1. 'keywords': 核心的搜尋主題
             2. 'time_instruction': 時間範圍指令（如果沒有指定，預設為'最近7天內'）
             3. 'num_instruction': 需要的新聞數量（如果沒有指定，預設為'5-10篇'）
+            4. 'language': 新聞來源的語言偏好（如果沒有指定，預設為'english'）
+               可能的值：'english'（英文）、'chinese'（中文）、'local'（當地語言）、'any'（不限）
 
             使用者需求：{user_prompt}
             
             只回傳 JSON 格式，範例：
-            {{"keywords": "主題", "time_instruction": "時間", "num_instruction": "數量"}}
+            {{"keywords": "主題", "time_instruction": "時間", "num_instruction": "數量", "language": "english"}}
             """
             
             response = parser_agent.run(prompt)
@@ -74,13 +76,15 @@ class SEANewsWorkflow:
                 keywords = parsed_data.get("keywords", user_prompt)
                 time_instruction = parsed_data.get("time_instruction", "最近7天內")
                 num_instruction = parsed_data.get("num_instruction", "5-10篇")
+                language = parsed_data.get("language", "english")
                 
-                self._update_progress(None, "prompt_parsing", f"✅ 需求解析完成：主題='{keywords}', 時間='{time_instruction}', 數量='{num_instruction}'")
+                self._update_progress(None, "prompt_parsing", f"✅ 需求解析完成：主題='{keywords}', 時間='{time_instruction}', 數量='{num_instruction}', 語言='{language}'")
                 
                 return {
                     "keywords": keywords,
                     "time_instruction": time_instruction,
-                    "num_instruction": num_instruction
+                    "num_instruction": num_instruction,
+                    "language": language
                 }
 
         except Exception as e:
@@ -90,7 +94,8 @@ class SEANewsWorkflow:
         return {
             "keywords": user_prompt,
             "time_instruction": "最近7天內",
-            "num_instruction": "5-10篇"
+            "num_instruction": "5-10篇",
+            "language": "english"
         }
 
     def __init__(self):
@@ -135,12 +140,20 @@ class SEANewsWorkflow:
             # 解析用戶 Prompt
             parsed_prompt = self._parse_prompt(search_query)
             
-            self._update_progress(callback_func, "step1", f"🔍 正在搜尋關於「{parsed_prompt['keywords']}」的新聞({parsed_prompt['time_instruction']}, {parsed_prompt['num_instruction']})...")
+            language_display = {
+                "english": "英文",
+                "chinese": "中文",
+                "local": "當地語言",
+                "any": "不限"
+            }.get(parsed_prompt.get('language', 'english'), '英文')
+            
+            self._update_progress(callback_func, "step1", f"🔍 正在搜尋關於「{parsed_prompt['keywords']}」的新聞({parsed_prompt['time_instruction']}, {parsed_prompt['num_instruction']}, {language_display})...")
             
             search_results = self.research_agent.search(
                 query=parsed_prompt['keywords'],
                 time_instruction=parsed_prompt['time_instruction'],
-                num_instruction=parsed_prompt['num_instruction']
+                num_instruction=parsed_prompt['num_instruction'],
+                language=parsed_prompt.get('language', 'english')
             )
             
             if search_results.get("status") == "error":
