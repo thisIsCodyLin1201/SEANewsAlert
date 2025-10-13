@@ -191,7 +191,8 @@ if submit_button:
                 f'<div class="success-box">'
                 f'<h3>🎉 執行成功！</h3>'
                 f'<p>報告已成功生成並發送至: <strong>{recipient_emails}</strong></p>'
-                f'<p>PDF 路徑: {result.get("pdf_path", "N/A")}</p>'
+                f'<p>📄 PDF 路徑: {result.get("pdf_path", "N/A")}</p>'
+                f'<p>📊 Excel 路徑: {result.get("excel_path", "N/A")}</p>'
                 f'</div>',
                 unsafe_allow_html=True
             )

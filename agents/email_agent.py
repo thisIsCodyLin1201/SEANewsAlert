@@ -26,6 +26,7 @@ class EmailAgent:
         self,
         recipients: Union[str, List[str]],
         pdf_path: Path,
+        excel_path: Path = None,
         subject: str = None,
         body: str = None
     ) -> bool:
@@ -35,6 +36,7 @@ class EmailAgent:
         Args:
             recipients: 收件人郵箱地址（字串或列表）
             pdf_path: PDF 報告路徑
+            excel_path: Excel 報告路徑（可選）
             subject: 郵件主題（可選）
             body: 郵件內容（可選）
             
@@ -52,7 +54,7 @@ class EmailAgent:
             subject = f"【{Config.APP_NAME}】東南亞金融新聞報告 - {datetime.now().strftime('%Y-%m-%d')}"
         
         if not body:
-            body = self._generate_email_body(pdf_path)
+            body = self._generate_email_body(pdf_path, excel_path)
         
         try:
             # 創建郵件
@@ -77,6 +79,21 @@ class EmailAgent:
             else:
                 raise FileNotFoundError(f"PDF 文件不存在: {pdf_path}")
             
+            # 添加 Excel 附件（如果提供）
+            if excel_path and excel_path.exists():
+                with open(excel_path, 'rb') as f:
+                    excel_attachment = MIMEApplication(
+                        f.read(), 
+                        _subtype='vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                    )
+                    excel_attachment.add_header(
+                        'Content-Disposition',
+                        'attachment',
+                        filename=excel_path.name
+                    )
+                    msg.attach(excel_attachment)
+                print(f"✅ 已添加 Excel 附件: {excel_path.name}")
+            
             # 連接 SMTP 服務器並發送
             with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
                 server.starttls()  # 啟用 TLS 加密
@@ -90,8 +107,19 @@ class EmailAgent:
             print(f"❌ 郵件發送失敗: {str(e)}")
             return False
     
-    def _generate_email_body(self, pdf_path: Path) -> str:
+    def _generate_email_body(self, pdf_path: Path, excel_path: Path = None) -> str:
         """生成郵件內容（HTML 格式）"""
+        
+        # 計算附件資訊
+        attachments_info = f"""
+                        <li><strong>PDF 報告</strong>：{pdf_path.name} ({pdf_path.stat().st_size / 1024:.2f} KB)</li>
+        """
+        
+        if excel_path and excel_path.exists():
+            attachments_info += f"""
+                        <li><strong>Excel 數據表</strong>：{excel_path.name} ({excel_path.stat().st_size / 1024:.2f} KB)</li>
+            """
+        
         return f"""
         <html>
         <head>
@@ -146,17 +174,20 @@ class EmailAgent:
                     <h2>親愛的用戶，您好！</h2>
                     <p>感謝您使用我們的服務。您請求的東南亞金融新聞報告已經生成完成。</p>
                     
-                    <h3>📎 報告資訊</h3>
+                    <h3>📎 附件清單</h3>
                     <ul>
-                        <li><strong>報告名稱</strong>：{pdf_path.name}</li>
+{attachments_info}
                         <li><strong>生成時間</strong>：{datetime.now().strftime('%Y年%m月%d日 %H:%M:%S')}</li>
-                        <li><strong>檔案大小</strong>：{pdf_path.stat().st_size / 1024:.2f} KB</li>
                     </ul>
                     
                     <h3>📋 報告內容</h3>
                     <p>本報告包含最新的東南亞金融市場動態，涵蓋主要國家的經濟新聞和市場分析。</p>
                     
-                    <p>請查看附件中的 PDF 報告以獲取詳細資訊。</p>
+                    <p><strong>附件說明：</strong></p>
+                    <ul>
+                        <li>📄 <strong>PDF 報告</strong>：完整的新聞分析報告，包含詳細摘要和市場洞察</li>
+                        {"<li>📊 <strong>Excel 數據表</strong>：結構化的新聞清單，便於進一步分析和處理</li>" if excel_path and excel_path.exists() else ""}
+                    </ul>
                     
                     <p style="margin-top: 20px;">
                         <strong>溫馨提示</strong>：如有任何問題，請隨時與我們聯繫。
