@@ -37,7 +37,7 @@ class ResearchAgent:
             markdown=True,
         )
     
-    def search(self, query: str, time_instruction: str = "最近 7 天內", num_instruction: str = "5-10篇", language: str = "english") -> Dict[str, Any]:
+    def search(self, query: str, time_instruction: str = "最近 7 天內", num_instruction: str = "5-10篇", language: str = "English") -> Dict[str, Any]:
         """
         執行搜尋
         
@@ -45,23 +45,24 @@ class ResearchAgent:
             query: 用戶的搜尋查詢
             time_instruction: 時間範圍指令 (例如: "最近一個月內")
             num_instruction: 新聞數量指令 (例如: "約15篇")
-            language: 新聞來源語言偏好 (english/chinese/local/any，預設: english)
+            language: 新聞來源語言 (例如: "English", "Chinese", "Vietnamese", "Thai", "Malay", "Indonesian")
             
         Returns:
             Dict: 包含搜尋結果和來源的字典
         """
         print(f"🔍 Research Agent 開始搜尋: {query} ({time_instruction}, {num_instruction}, 語言: {language})")
         
-        # 根據語言偏好設定搜尋指令
-        language_instruction = ""
-        if language == "chinese":
-            language_instruction = "6.  **語言偏好**: 優先搜尋**中文新聞來源**（繁體中文或簡體中文）。"
-        elif language == "local":
-            language_instruction = "6.  **語言偏好**: 優先搜尋**當地語言的新聞來源**（泰文、印尼文、越南文、馬來文、菲律賓語等）。"
-        elif language == "any":
-            language_instruction = "6.  **語言偏好**: 不限制新聞語言，可以是英文、中文或當地語言。"
-        else:  # english (預設)
-            language_instruction = "6.  **語言偏好**: 優先搜尋**英文新聞來源**。"
+        # 建立語言相關的搜尋關鍵字
+        language_keywords = {
+            "English": "in English",
+            "Chinese": "中文 OR 華語 OR Chinese",
+            "Vietnamese": "tiếng Việt OR Vietnamese",
+            "Thai": "ภาษาไทย OR Thai",
+            "Malay": "Bahasa Melayu OR Malay",
+            "Indonesian": "Bahasa Indonesia OR Indonesian"
+        }
+        
+        language_hint = language_keywords.get(language, "in English")
         
         # 強化搜尋提示詞，聚焦東南亞金融
         enhanced_query = f"""
@@ -71,9 +72,9 @@ class ResearchAgent:
         1.  **搜尋範圍**: 嚴格鎖定東南亞國家（新加坡、馬來西亞、泰國、印尼、越南、菲律賓）。
         2.  **時間要求**: 嚴格篩選在 **{time_instruction}** 內發布的新聞。
         3.  **數量要求**: 你的目標是找到並提供 **{num_instruction}** 的高品質新聞。你必須盡力達成這個數量目標。
-        4.  **重試策略**: 如果初步搜尋結果數量不足，**請不要隨意更改核心關鍵字**。你應該嘗試從**更多元、更廣泛的來源網站**（例如：其他國家的主流媒體、專業金融分析網站、行業部落格）進行搜尋，以擴大資訊覆蓋面。
-        5.  **資訊完整性**: 每條新聞都必須包含清晰的「標題」、「摘要」、「來源網站」、「完整網址」和「發布日期」。
-        {language_instruction}
+        4.  **語言要求**: 請優先搜尋 **{language}** 語言的新聞來源。在搜尋時加上關鍵字：{language_hint}
+        5.  **重試策略**: 如果初步搜尋結果數量不足，**請不要隨意更改核心關鍵字**。你應該嘗試從**更多元、更廣泛的來源網站**（例如：其他國家的主流媒體、專業金融分析網站、行業部落格）進行搜尋，以擴大資訊覆蓋面。
+        6.  **資訊完整性**: 每條新聞都必須包含清晰的「標題」、「摘要」、「來源網站」、「完整網址」和「發布日期」。
 
         **輸出格式要求:**
         你必須嚴格遵循下面的 JSON 格式返回結果。`results` 陣列必須包含所有找到的新聞。

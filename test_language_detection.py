@@ -1,89 +1,86 @@
 """
-測試語言識別功能
+測試語言指定功能
 """
+import sys
+import os
+
+# 將專案根目錄加入 Python 路徑
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 from workflow import SEANewsWorkflow
 from config import Config
 
-def test_language_detection():
-    """測試不同語言需求的解析"""
-    
-    print("=" * 70)
-    print("測試語言識別功能")
-    print("=" * 70)
-    
-    # 驗證配置
-    if not Config.validate():
-        print("❌ 配置驗證失敗")
+
+def validate_config():
+    """驗證配置"""
+    if not Config.OPENAI_API_KEY or Config.OPENAI_API_KEY == "your-openai-api-key":
+        print("❌ 請先設定 OPENAI_API_KEY")
+        return False
+    print("✅ 配置驗證成功")
+    return True
+
+
+def test_language_parsing():
+    """測試語言解析功能"""
+    if not validate_config():
         return
     
-    print("✅ 配置驗證成功")
+    print("=" * 70)
+    print("測試語言指定功能")
+    print("=" * 70)
     
-    # 初始化工作流程
     workflow = SEANewsWorkflow()
     
-    # 測試案例
     test_cases = [
         {
-            "input": "我想找中文新聞關於新加坡金融科技的發展",
-            "expected_language": "chinese"
+            "input": "我想找最近一個月內，關於新加坡AI領域的20篇中文投資趨勢新聞",
+            "expected_language": "Chinese"
         },
         {
-            "input": "找英文新聞關於泰國央行的政策",
-            "expected_language": "english"
+            "input": "找10篇關於泰國央行的英文新聞",
+            "expected_language": "English"
         },
         {
-            "input": "搜尋當地語言的越南股市新聞",
-            "expected_language": "local"
+            "input": "越南電商市場分析（越南文）",
+            "expected_language": "Vietnamese"
         },
         {
-            "input": "不限語言，找印尼經濟的新聞",
-            "expected_language": "any"
+            "input": "馬來西亞房地產趨勢",  # 沒有指定語言，應該預設為英文
+            "expected_language": "English"
         },
         {
-            "input": "新加坡AI投資趨勢",
-            "expected_language": "english"  # 預設值
+            "input": "印尼金融科技新聞 印尼語",
+            "expected_language": "Indonesian"
         }
     ]
     
     print("\n開始測試...\n")
     
     success_count = 0
-    for i, test_case in enumerate(test_cases, 1):
-        print(f"測試案例 {i}: {test_case['input']}")
+    for i, case in enumerate(test_cases, 1):
+        print(f"測試案例 {i}: {case['input']}")
         print("-" * 70)
         
-        # 解析需求
-        parsed = workflow._parse_prompt(test_case['input'])
+        result = workflow._parse_prompt(case['input'])
         
-        # 檢查結果
-        detected_language = parsed.get('language', 'english')
-        expected_language = test_case['expected_language']
+        actual_language = result.get('language', 'Unknown')
+        expected_language = case['expected_language']
         
-        language_names = {
-            "english": "英文",
-            "chinese": "中文", 
-            "local": "當地語言",
-            "any": "不限"
-        }
-        
-        if detected_language == expected_language:
-            print(f"✅ 語言識別正確: {language_names.get(detected_language, detected_language)}")
+        if actual_language == expected_language:
+            print(f"✅ 語言解析正確: {actual_language}")
             success_count += 1
         else:
-            print(f"❌ 語言識別錯誤:")
-            print(f"   預期: {language_names.get(expected_language, expected_language)}")
-            print(f"   實際: {language_names.get(detected_language, detected_language)}")
+            print(f"⚠️ 語言解析不符: 期望={expected_language}, 實際={actual_language}")
         
-        print(f"   完整解析結果:")
-        print(f"   - 關鍵字: {parsed.get('keywords', 'N/A')}")
-        print(f"   - 時間範圍: {parsed.get('time_instruction', 'N/A')}")
-        print(f"   - 數量: {parsed.get('num_instruction', 'N/A')}")
-        print(f"   - 語言: {language_names.get(parsed.get('language', 'english'), 'N/A')}")
+        print(f"   關鍵字: {result.get('keywords')}")
+        print(f"   時間範圍: {result.get('time_instruction')}")
+        print(f"   數量: {result.get('num_instruction')}")
         print()
     
     print("=" * 70)
     print(f"測試完成: {success_count}/{len(test_cases)} 個案例成功")
     print("=" * 70)
 
+
 if __name__ == "__main__":
-    test_language_detection()
+    test_language_parsing()
