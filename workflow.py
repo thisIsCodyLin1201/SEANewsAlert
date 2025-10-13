@@ -23,7 +23,7 @@ class SEANewsWorkflow:
                 id=Config.OPENAI_MODEL,
                 api_key=Config.OPENAI_API_KEY,
                 # max_tokens=512,
-                json_response=True
+                response_format={'type': 'json_object'}
             )
             
             system_prompt = """
@@ -133,34 +133,43 @@ class SEANewsWorkflow:
             # ============ 步驟 2: 資訊結構化 ============
             self._update_progress(callback_func, "step2", "📊 正在分析並結構化資訊...")
             
-            markdown_report = self.analyst_agent.analyze(search_results)
+            markdown_report, structured_news = self.analyst_agent.analyze(search_results)
             
             result["steps"]["analysis"] = {
                 "status": "completed",
                 "timestamp": datetime.now().isoformat(),
-                "report_length": len(markdown_report)
+                "report_length": len(markdown_report),
+                "news_count": len(structured_news)
             }
-            self._update_progress(callback_func, "step2", "✅ 資訊分析完成")
+            self._update_progress(callback_func, "step2", f"✅ 資訊分析完成（共 {len(structured_news)} 則新聞）")
             
-            # ============ 步驟 3: 生成 PDF 報告 ============
-            self._update_progress(callback_func, "step3", "📄 正在生成 PDF 報告...")
+            # ============ 步驟 3: 生成 PDF 和 Excel 報告 ============
+            self._update_progress(callback_func, "step3", "📄 正在生成 PDF 和 Excel 報告...")
             
+            # 生成 PDF
             pdf_path = self.report_agent.generate_pdf(markdown_report)
             
-            result["steps"]["pdf_generation"] = {
+            # 生成 Excel（使用相同的基礎文件名）
+            excel_filename = pdf_path.stem + '.xlsx'
+            excel_path = self.report_agent.generate_excel(structured_news, excel_filename)
+            
+            result["steps"]["report_generation"] = {
                 "status": "completed",
                 "timestamp": datetime.now().isoformat(),
                 "pdf_path": str(pdf_path),
-                "pdf_size": pdf_path.stat().st_size
+                "pdf_size": pdf_path.stat().st_size,
+                "excel_path": str(excel_path),
+                "excel_size": excel_path.stat().st_size
             }
-            self._update_progress(callback_func, "step3", f"✅ PDF 生成完成: {pdf_path.name}")
+            self._update_progress(callback_func, "step3", f"✅ 報告生成完成: {pdf_path.name} 和 {excel_path.name}")
             
             # ============ 步驟 4: 發送郵件 ============
-            self._update_progress(callback_func, "step4", "📧 正在發送郵件...")
+            self._update_progress(callback_func, "step4", "📧 正在發送郵件（含 PDF 和 Excel 附件）...")
             
             email_success = self.email_agent.send_report(
                 recipients=recipient_emails,
-                pdf_path=pdf_path
+                pdf_path=pdf_path,
+                excel_path=excel_path
             )
             
             if not email_success:
@@ -169,19 +178,21 @@ class SEANewsWorkflow:
             result["steps"]["email"] = {
                 "status": "completed",
                 "timestamp": datetime.now().isoformat(),
-                "recipients": recipient_emails
+                "recipients": recipient_emails,
+                "attachments": [str(pdf_path), str(excel_path)]
             }
-            self._update_progress(callback_func, "step4", "✅ 郵件發送完成")
+            self._update_progress(callback_func, "step4", "✅ 郵件發送完成（含 PDF 和 Excel）")
             
             # ============ 完成 ============
             result["status"] = "success"
             result["end_time"] = datetime.now().isoformat()
             result["pdf_path"] = str(pdf_path)
+            result["excel_path"] = str(excel_path)
             
             self._update_progress(
                 callback_func, 
                 "complete", 
-                f"🎉 所有步驟完成！報告已發送至: {recipient_emails}"
+                f"🎉 所有步驟完成！報告已發送至: {recipient_emails}（PDF + Excel）"
             )
             
             return result

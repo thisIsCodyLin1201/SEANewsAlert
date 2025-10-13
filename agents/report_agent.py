@@ -1,10 +1,10 @@
 """
 Report Generator Agent
-負責將 Markdown 報告轉換為 PDF
+負責將 Markdown 報告轉換為 PDF 和 Excel
 """
 from pathlib import Path
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List, Dict
 import markdown
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -16,6 +16,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 from config import Config
 import re
 from html.parser import HTMLParser
+import pandas as pd
 
 
 class HTMLToTextParser(HTMLParser):
@@ -241,6 +242,89 @@ class ReportGeneratorAgent:
         # [文字](URL) -> 文字 (URL)
         text = re.sub(r'\[(.*?)\]\((.*?)\)', r'\1 (<font color="blue">\2</font>)', text)
         return text
+    
+    def generate_excel(
+        self, 
+        news_data: List[Dict[str, str]], 
+        filename: Optional[str] = None
+    ) -> Path:
+        """
+        生成 Excel 報告
+        
+        Args:
+            news_data: 結構化的新聞數據列表
+            filename: 可選的文件名，不提供則自動生成
+            
+        Returns:
+            Path: 生成的 Excel 文件路徑
+        """
+        print("📊 Report Generator Agent 開始生成 Excel...")
+        
+        # 生成文件名
+        if not filename:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"東南亞金融新聞報告_{timestamp}.xlsx"
+        
+        # 確保文件名以 .xlsx 結尾
+        if not filename.endswith('.xlsx'):
+            filename += '.xlsx'
+        
+        excel_path = self.reports_dir / filename
+        
+        try:
+            # 創建 DataFrame
+            df = pd.DataFrame(news_data)
+            
+            # 只保留需要的列，移除「關鍵字」和「來源」
+            columns_order = ['新聞標題（中文）', '來源國家', '來源網站連結', '發布日期']
+            existing_columns = [col for col in columns_order if col in df.columns]
+            df = df[existing_columns]
+            
+            # 使用 openpyxl 引擎寫入 Excel
+            with pd.ExcelWriter(excel_path, engine='openpyxl') as writer:
+                df.to_excel(writer, index=False, sheet_name='新聞報告')
+                
+                # 獲取工作表並調整列寬
+                worksheet = writer.sheets['新聞報告']
+                
+                # 設置列寬（調整後的順序）
+                column_widths = {
+                    'A': 50,  # 新聞標題（中文）
+                    'B': 15,  # 來源國家
+                    'C': 60,  # 來源網站連結
+                    'D': 15,  # 發布日期
+                }
+                
+                for col, width in column_widths.items():
+                    worksheet.column_dimensions[col].width = width
+                
+                # 設置標題列樣式（粗體、置中）
+                from openpyxl.styles import Font, Alignment, PatternFill
+                
+                header_font = Font(bold=True, size=12)
+                header_fill = PatternFill(start_color='CCE5FF', end_color='CCE5FF', fill_type='solid')
+                center_alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+                left_alignment = Alignment(horizontal='left', vertical='top', wrap_text=True)
+                
+                for cell in worksheet[1]:
+                    cell.font = header_font
+                    cell.fill = header_fill
+                    cell.alignment = center_alignment
+                
+                # 設置資料列樣式
+                for row in worksheet.iter_rows(min_row=2, max_row=worksheet.max_row):
+                    for idx, cell in enumerate(row):
+                        cell.alignment = left_alignment
+                        # 如果是連結列（C列，調整後的位置），設置為藍色字體
+                        if idx == 2:  # 來源網站連結
+                            cell.font = Font(color='0000FF', underline='single')
+            
+            print(f"✅ Excel 生成成功: {excel_path}")
+            return excel_path
+            
+        except Exception as e:
+            print(f"❌ Excel 生成失敗: {str(e)}")
+            raise
     
 
 

@@ -5,8 +5,10 @@ Analyst Agent
 from agno.agent import Agent
 from agno.models.openai import OpenAIChat
 from config import Config
-from typing import Dict, Any
+from typing import Dict, Any, List, Tuple
 from datetime import datetime
+import json
+import re
 
 
 class AnalystAgent:
@@ -38,7 +40,7 @@ class AnalystAgent:
             markdown=True,
         )
     
-    def analyze(self, search_results: Dict[str, Any]) -> str:
+    def analyze(self, search_results: Dict[str, Any]) -> Tuple[str, List[Dict[str, str]]]:
         """
         分析並結構化搜尋結果
         
@@ -46,7 +48,7 @@ class AnalystAgent:
             search_results: 來自 Research Agent 的搜尋結果
             
         Returns:
-            str: Markdown 格式的報告
+            Tuple[str, List[Dict]]: (Markdown 格式的報告, 結構化新聞列表)
         """
         print("📊 Analyst Agent 開始分析...")
         
@@ -116,13 +118,16 @@ class AnalystAgent:
             else:
                 markdown_report = str(response)
             
+            # 提取結構化新聞數據
+            structured_news = self._extract_structured_data(markdown_report, content, query)
+            
             print("✅ Analyst Agent 分析完成")
-            return markdown_report
+            return markdown_report, structured_news
             
         except Exception as e:
             print(f"❌ Analyst Agent 分析失敗: {str(e)}")
             # 返回錯誤報告
-            return f"""
+            error_report = f"""
 # 報告生成失敗
 
 ## 錯誤資訊
@@ -133,6 +138,148 @@ class AnalystAgent:
 
 請檢查系統設定並重試。
 """
+            return error_report, []
+    
+    def _extract_structured_data(self, markdown_report: str, raw_content: str, query: str) -> List[Dict[str, str]]:
+        """
+        從 Markdown 報告和原始內容中提取結構化新聞數據
+        
+        優先從 Markdown 報告中提取，因為其中的標題已經被翻譯成中文
+        
+        Args:
+            markdown_report: Markdown 格式的報告（包含已翻譯的中文標題）
+            raw_content: 來自搜尋的原始內容
+            query: 搜尋查詢（作為關鍵字）
+            
+        Returns:
+            List[Dict]: 結構化的新聞列表
+        """
+        structured_news = []
+        
+        try:
+            # 優先從 Markdown 報告中提取（標題已翻譯成中文）
+            print("📝 從 Markdown 報告中提取結構化數據（含中文標題）...")
+            structured_news = self._extract_from_markdown(markdown_report, query)
+            
+            # 如果 Markdown 提取失敗，才嘗試從 JSON 解析
+            if not structured_news:
+                print("⚠️ Markdown 提取失敗，嘗試從 JSON 解析...")
+                json_match = re.search(r'```json\s*(\{.*?\})\s*```', raw_content, re.DOTALL)
+                if json_match:
+                    json_data = json.loads(json_match.group(1))
+                    results = json_data.get('results', [])
+                    
+                    for result in results:
+                        # 提取國家資訊（從來源或標題中）
+                        country = self._extract_country(
+                            result.get('title', ''),
+                            result.get('source', ''),
+                            result.get('summary', '')
+                        )
+                        
+                        structured_news.append({
+                            '新聞標題（中文）': result.get('title', ''),
+                            '來源國家': country,
+                            '關鍵字': query,
+                            '來源網站連結': result.get('url', ''),
+                            '發布日期': result.get('date', ''),
+                            '來源': result.get('source', '')
+                        })
+        
+        except Exception as e:
+            print(f"⚠️ 結構化數據提取失敗: {str(e)}")
+            # 作為後備，再次嘗試從 Markdown 中提取
+            structured_news = self._extract_from_markdown(markdown_report, query)
+        
+        if structured_news:
+            print(f"✅ 成功提取 {len(structured_news)} 則新聞（標題已為中文）")
+        else:
+            print("⚠️ 未能提取到任何新聞數據")
+        
+        return structured_news
+    
+    def _extract_country(self, title: str, source: str, summary: str) -> str:
+        """從文本中提取國家資訊"""
+        text = f"{title} {source} {summary}".lower()
+        
+        countries = {
+            'singapore': '新加坡',
+            'malaysia': '馬來西亞',
+            'thailand': '泰國',
+            'indonesia': '印尼',
+            'vietnam': '越南',
+            'philippines': '菲律賓',
+            '新加坡': '新加坡',
+            '馬來西亞': '馬來西亞',
+            '泰國': '泰國',
+            '印尼': '印尼',
+            '越南': '越南',
+            '菲律賓': '菲律賓'
+        }
+        
+        for key, value in countries.items():
+            if key in text:
+                return value
+        
+        return '東南亞'
+    
+    def _extract_from_markdown(self, markdown_report: str, query: str) -> List[Dict[str, str]]:
+        """從 Markdown 報告中提取新聞資訊"""
+        structured_news = []
+        
+        # 使用正則表達式匹配新聞標題和相關資訊
+        news_pattern = r'###\s+\d+\.\s+(.*?)\n(.*?)(?=###|\Z)'
+        matches = re.findall(news_pattern, markdown_report, re.DOTALL)
+        
+        for title, content in matches:
+            title = title.strip()
+            
+            # 提取來源和網址
+            source_match = re.search(r'\*\*來源\*\*[：:]\s*\[?(.*?)\]?\(?(https?://[^\s\)]+)', content)
+            source = ''
+            url = ''
+            if source_match:
+                source = source_match.group(1).strip()
+                url = source_match.group(2).strip()
+            else:
+                # 嘗試另一種格式
+                url_match = re.search(r'(https?://[^\s\)]+)', content)
+                if url_match:
+                    url = url_match.group(1).strip()
+            
+            # 提取日期 - 改進的日期提取邏輯
+            date = ''
+            # 首先嘗試匹配 "**日期**：YYYY-MM-DD" 格式
+            date_match = re.search(r'\*\*日期\*\*[：:]\s*([^\n*]+)', content)
+            if date_match:
+                date = date_match.group(1).strip()
+            else:
+                # 嘗試匹配其他常見日期格式
+                # 格式如：2025-10-13, 2025/10/13, 2025.10.13
+                date_pattern = r'(\d{4}[-/\.]\d{1,2}[-/\.]\d{1,2})'
+                date_match2 = re.search(date_pattern, content)
+                if date_match2:
+                    date = date_match2.group(1)
+                else:
+                    # 嘗試中文日期格式：2025年10月13日
+                    date_pattern_cn = r'(\d{4}年\d{1,2}月\d{1,2}日)'
+                    date_match3 = re.search(date_pattern_cn, content)
+                    if date_match3:
+                        date = date_match3.group(1)
+            
+            # 提取國家
+            country = self._extract_country(title, source, content)
+            
+            structured_news.append({
+                '新聞標題（中文）': title,
+                '來源國家': country,
+                '關鍵字': query,
+                '來源網站連結': url,
+                '發布日期': date,
+                '來源': source
+            })
+        
+        return structured_news
 
 
 if __name__ == "__main__":
