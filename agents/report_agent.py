@@ -275,8 +275,8 @@ class ReportGeneratorAgent:
             # 創建 DataFrame
             df = pd.DataFrame(news_data)
             
-            # 只保留需要的列，移除「關鍵字」和「來源」
-            columns_order = ['新聞標題（中文）', '來源國家', '來源網站連結', '發布日期']
+            # 調整列順序，加入「摘要」和「重點分析」，移除「關鍵字」和「來源」
+            columns_order = ['新聞標題（中文）', '來源國家', '來源網站連結', '發布日期', '摘要', '重點分析']
             existing_columns = [col for col in columns_order if col in df.columns]
             df = df[existing_columns]
             
@@ -293,6 +293,8 @@ class ReportGeneratorAgent:
                     'B': 15,  # 來源國家
                     'C': 60,  # 來源網站連結
                     'D': 15,  # 發布日期
+                    'E': 80,  # 摘要
+                    'F': 80,  # 重點分析
                 }
                 
                 for col, width in column_widths.items():
@@ -315,7 +317,7 @@ class ReportGeneratorAgent:
                 for row in worksheet.iter_rows(min_row=2, max_row=worksheet.max_row):
                     for idx, cell in enumerate(row):
                         cell.alignment = left_alignment
-                        # 如果是連結列（C列，調整後的位置），設置為藍色字體
+                        # 如果是連結列（C列），設置為藍色字體
                         if idx == 2:  # 來源網站連結
                             cell.font = Font(color='0000FF', underline='single')
             
