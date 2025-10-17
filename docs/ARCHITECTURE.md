@@ -84,7 +84,7 @@ def execute(search_query, recipient_emails):
 
 **職責**: 執行深度網路搜尋
 
-**使用模型**: ChatGPT (gpt-4o-mini)
+**使用模型**: ChatGPT (GPT-5)
 
 **工具**: DuckDuckGoTools
 
@@ -96,7 +96,7 @@ User Query → Enhanced Prompt → ChatGPT + Search → Structured Results
 **關鍵配置**:
 ```python
 Agent(
-    model=OpenAIChat(id="gpt-4o-mini"),
+    model=OpenAIChat(id="gpt-5-2025-08-07"),
     tools=[DuckDuckGoTools()],
     instructions=[專門的搜尋指令]
 )
@@ -200,7 +200,7 @@ Agent(
 class Config:
     # OpenAI
     OPENAI_API_KEY: str
-    OPENAI_MODEL: str = "gpt-4o-mini"
+    OPENAI_MODEL: str = "gpt-5-2025-08-07"
     OPENAI_API_BASE: str = "https://api.openai.com/v1"
     
     # Email
