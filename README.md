@@ -197,173 +197,35 @@ graph TD
 
 ### 詳細步驟
 
-1. **需求解析 (Workflow.parse_prompt)**
-   - 使用 GPT-5 自動解析使用者輸入
-   - 提取語言、時間範圍、新聞數量等參數
-   - 進度：0-24%
+## 🔄 工作流程
 
-2. **網路搜尋 (ResearchAgent)**
-   - 使用 DuckDuckGo 進行網路搜尋
-   - 根據解析結果搜尋 5-15 條新聞
-   - 記錄標題、來源、網址
-   - 進度：25-49%
+1. **需求解析** → 使用 GPT-5 自動解析使用者輸入 (0-24%)
+2. **網路搜尋** → DuckDuckGo 搜尋新聞 (25-49%)
+3. **資訊分析** → GPT-5 整理並生成 Markdown 報告 (50-74%)
+4. **報告生成** → ReportLab 生成 PDF，Pandas 生成 Excel (75-89%)
+5. **郵件發送** → SMTP 發送報告 (90-100%)
 
-3. **資訊分析 (AnalystAgent)**
-   - 使用 GPT-5 整理搜尋結果
-   - 生成結構化的 Markdown 格式報告
-   - 支援繁中/英文輸出
-   - 進度：50-74%
+##  疑難排解
 
-4. **報告生成 (ReportGeneratorAgent)**
-   - 使用 ReportLab 生成 PDF
-   - 使用 Pandas 生成 Excel
-   - 專業排版，支援中文
-   - 進度：75-89%
+完整故障排除請查看 **[TROUBLESHOOTING.md](./TROUBLESHOOTING.md)**
 
-5. **郵件發送 (EmailAgent)**
-   - 使用 SMTP 服務（Gmail）
-   - 附加 PDF 和 Excel 報告
-   - 專業郵件模板
-   - 進度：90-100%
+**常見問題**：
+- 啟動失敗 → 執行 `python -m uvicorn app.main:app`
+- OpenAI 錯誤 → 檢查 `.env` 的 `OPENAI_API_KEY`
+- 郵件失敗 → Gmail 必須使用「應用程式密碼」
+- PDF 中文問題 → 系統已自動處理跨平台字體
 
-```
+## 📝 版本記錄
 
-### 添加新功能
+- **v2.0.0**: FastAPI 架構，前後端分離，RESTful API
+- **v1.0.0**: 初始版本（Streamlit，已淘汰）
 
-1. 在對應的 Agent 模組中添加功能
-2. 更新 `app/services/workflow.py` 中的工作流程
-3. 如需新增 API，更新 `app/routers/tasks.py`
-4. 測試並驗證
-5. 更新文檔（README.md 和 FRONTEND_API.md）
+## 📚 相關文件
 
-## 🚢 部署方案
-
-### Docker 部署
-
-專案已包含 `Dockerfile` 和 `docker-compose.yml`。
-
-```bash
-# 構建映像
-docker build -t seanews-api .
-
-# 運行容器
-docker run -p 8000:8000 --env-file .env seanews-api
-
-# 或使用 docker-compose
-docker-compose up -d
-```
-
-### 雲端部署選項
-
-- **Google Cloud Run**: Serverless, 自動擴展（推薦）
-- **AWS ECS/Fargate**: 彈性容器服務
-- **Azure Container Instances**: 簡單快速部署
-- **Heroku**: 快速原型部署
-
-### 生產環境建議
-
-1. **使用環境變數**: 不要將 `.env` 提交到版本控制
-2. **啟用 HTTPS**: 使用反向代理（Nginx/Traefik）
-3. **任務持久化**: 考慮使用 Redis 或資料庫儲存任務狀態
-4. **監控告警**: 整合 Sentry 或其他監控服務
-5. **日誌管理**: 使用 ELK/Loki 集中管理日誌
-
-## 📊 性能指標
-
-- 單次完整流程處理時間: **2-5 分鐘**
-  - 需求解析: 5-10 秒
-  - 新聞搜尋: 30-60 秒
-  - 資訊分析: 30-60 秒
-  - 報告生成: 20-40 秒
-  - 郵件發送: 5-10 秒
-- 並發支援: 多任務同時執行（記憶體內管理）
-- API 響應時間: < 100ms（不含工作流執行）
-
-## 🔐 安全性
-
-- API Key 使用 `.env` 檔案管理
-- `.env` 已加入 `.gitignore`
-- HTTPS 加密傳輸（生產環境）
-- 郵件內容隱私保護
-
-## 🐛 疑難排解
-
-完整的故障排除指南請查看 **[TROUBLESHOOTING.md](./TROUBLESHOOTING.md)**
-
-### 常見問題快速解答
-
-**Q: 啟動時提示 "uvicorn not recognized"？**
-```bash
-# 使用這個啟動方式
-python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
-# 或直接執行
-START-FAST.bat
-```
-
-**Q: OpenAI API 連接失敗？**
-- 檢查 `.env` 中的 `OPENAI_API_KEY` 是否正確
-- 確認 API Key 有足夠額度
-- 測試連接：`curl https://api.openai.com/v1/models -H "Authorization: Bearer YOUR_KEY"`
-
-**Q: 郵件發送失敗？**
-- Gmail 使用者：必須使用「應用程式密碼」，不是普通密碼
-- 設定路徑：Google 帳戶 → 安全性 → 兩步驟驗證 → 應用程式密碼
-- 檢查 `.env` 中的 `EMAIL_ADDRESS` 和 `EMAIL_PASSWORD`
-
-**Q: 任務一直卡在某個進度？**
-- 檢查終端機的錯誤訊息
-- 可能是 OpenAI API 逾時，等待或重試
-- 檢查網路連線
-
-**Q: PDF 中文顯示問題？**
-- ReportLab 會自動處理中文字體
-- Windows 系統通常已內建微軟正黑體
-
-**Q: 前端無法連接 API？**
-- 確認服務已啟動（http://127.0.0.1:8000/health 應返回 OK）
-- 檢查 CORS 設定（`app/main.py`）
-- 確認前端使用正確的 API 端點
-
-## 📝 更新日誌
-
-### v2.0.0 (2025-01)
-- ✨ **重大更新**：從 Streamlit 遷移到 FastAPI + 前後端分離架構
-- 🚀 新增 RESTful API 端點（POST 創建任務, GET 查詢狀態）
-- 📊 支援背景任務執行與即時進度追蹤
-- 📘 提供完整 API 文件（FRONTEND_API.md）
-- 🎨 簡化前端介面（自動參數解析）
-- 📄 同時支援 PDF 和 Excel 報告生成
-- 🔧 新增多個啟動腳本（START-FAST.bat, START-ALL.bat）
-
-### v1.0.0 (2024-12)
-- ✨ 初始版本發布
-- 🔍 實現 OpenAI + DuckDuckGo 新聞搜尋
-- 📊 自動化報告分析與生成
-- 📧 SMTP 郵件自動發送
-- 🎨 Streamlit Web 介面（已淘汰）
-
-## � 相關文件
-
-- **[FRONTEND_API.md](./FRONTEND_API.md)** - 📘 前端 API 完整文件（前端工程師必讀）
-- **[PRD.md](./PRD.md)** - 📋 產品需求文件
-- **[HOW_TO_START.md](./HOW_TO_START.md)** - 🚀 詳細啟動指南
-- **[TROUBLESHOOTING.md](./TROUBLESHOOTING.md)** - 🔧 故障排除指南
-- **[docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)** - 🏗️ 技術架構說明
-- **[docs/SYSTEM_FLOW.md](./docs/SYSTEM_FLOW.md)** - 🔄 系統流程圖
-
-## �📄 授權
-
-本專案為內部使用專案。
-
-## 🤝 貢獻
-
-歡迎提交 Issue 和 Pull Request！
-
-## 📞 聯絡方式
-
-如有問題或建議，請聯絡開發團隊。
+- **[FRONTEND_API.md](./FRONTEND_API.md)** - API 完整文件
+- **[HOW_TO_START.md](./HOW_TO_START.md)** - 啟動指南
+- **[TROUBLESHOOTING.md](./TROUBLESHOOTING.md)** - 故障排除
 
 ---
 
-**技術棧**: FastAPI + OpenAI GPT-5 + DuckDuckGo + ReportLab + Pandas  
-**版本**: 2.0.0 | **架構**: RESTful API（前後端分離）
+**版本**: 2.0.0 | **架構**: FastAPI + OpenAI GPT-5 + DuckDuckGo + ReportLab

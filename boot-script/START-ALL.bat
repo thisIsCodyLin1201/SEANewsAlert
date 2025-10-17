@@ -15,12 +15,13 @@ echo [1/2] 安裝所有必要套件...
 echo     這可能需要 1-2 分鐘，請稍候...
 echo.
 
-REM 一次安裝所有套件
+REM 使用 requirements-api.txt 安裝所有套件
 python -m pip install --upgrade pip -q
-python -m pip install fastapi uvicorn[standard] pydantic[email] ddgs agno reportlab pandas openpyxl python-dotenv -q
+python -m pip install -r requirements-api.txt -q
 
 if %errorlevel% neq 0 (
     echo [錯誤] 套件安裝失敗
+    echo 請檢查 requirements-api.txt 是否存在
     pause
     exit /b 1
 )

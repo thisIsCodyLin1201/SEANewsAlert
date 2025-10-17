@@ -25,7 +25,7 @@ class Config:
     
     # Application Configuration
     APP_NAME = os.getenv("APP_NAME", "東南亞金融新聞搜尋系統")
-    APP_VERSION = os.getenv("APP_VERSION", "1.0.0")
+    APP_VERSION = os.getenv("APP_VERSION", "2.0.0")
     DEBUG = os.getenv("DEBUG", "false").lower() == "true"
     
     # Agno Configuration
