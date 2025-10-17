@@ -2,9 +2,14 @@
 chcp 65001 > nul
 setlocal enabledelayedexpansion
 
+REM 切換到專案根目錄（.bat 檔案的上一層）
+cd /d "%~dp0\.."
+
 echo ========================================
 echo 東南亞金融新聞搜尋系統 - 快速啟動
 echo ========================================
+echo.
+echo 📂 工作目錄: %CD%
 echo.
 
 REM 檢查 Python 是否安裝
