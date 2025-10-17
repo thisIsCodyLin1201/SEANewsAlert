@@ -44,13 +44,24 @@ class ReportGeneratorAgent:
         """設置 PDF 樣式"""
         self.styles = getSampleStyleSheet()
         
-        # 嘗試註冊中文字體（如果系統有的話）
+        # 嘗試註冊中文字體（支援 Windows 和 macOS）
         try:
-            # Windows 系統常見中文字體路徑
+            # Windows 和 macOS 常見中文字體路徑
             font_paths = [
-                'C:\\Windows\\Fonts\\msjh.ttc',      # 微軟正黑體
-                'C:\\Windows\\Fonts\\msyh.ttc',      # 微軟雅黑
-                'C:\\Windows\\Fonts\\kaiu.ttf',      # 標楷體
+                # Windows 系統
+                'C:\\Windows\\Fonts\\msjh.ttc',           # 微軟正黑體
+                'C:\\Windows\\Fonts\\msyh.ttc',           # 微軟雅黑
+                'C:\\Windows\\Fonts\\kaiu.ttf',           # 標楷體
+                'C:\\Windows\\Fonts\\mingliu.ttc',        # 細明體
+                # macOS 系統
+                '/System/Library/Fonts/PingFang.ttc',     # 蘋方（macOS 預設）
+                '/System/Library/Fonts/STHeiti Light.ttc', # 華文黑體
+                '/System/Library/Fonts/STHeiti Medium.ttc',
+                '/Library/Fonts/Songti.ttc',              # 宋體
+                '/System/Library/Fonts/Hiragino Sans GB.ttc', # 冬青黑體
+                # Linux 系統（額外支援）
+                '/usr/share/fonts/truetype/arphic/uming.ttc',
+                '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',
             ]
             
             font_registered = False
@@ -63,11 +74,12 @@ class ReportGeneratorAgent:
                         font_registered = True
                         print(f"✅ 已註冊中文字體: {font_path}")
                         break
-                    except:
+                    except Exception as font_error:
+                        # 某些字體文件可能無法載入，繼續嘗試下一個
                         continue
             
             if not font_registered:
-                print("⚠️  未找到中文字體，使用預設字體")
+                print("⚠️  未找到中文字體，使用預設字體（可能無法正確顯示中文）")
                 self.chinese_font = 'Helvetica'
         except Exception as e:
             print(f"⚠️  字體註冊失敗，使用預設字體: {str(e)}")
