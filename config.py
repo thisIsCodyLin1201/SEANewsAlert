@@ -14,7 +14,7 @@ class Config:
     
     # OpenAI Configuration
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-    OPENAI_MODEL = "gpt-5-2025-08-07"  # 使用 mini-deep-research 能力的模型
+    OPENAI_MODEL = "gpt-5-2025-08-07"
     OPENAI_API_BASE = "https://api.openai.com/v1"  # 確保端點一致
     
     # Email Configuration
