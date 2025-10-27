@@ -55,17 +55,19 @@ class ResearchAgent:
         """
         print(f"🔍 Research Agent 開始搜尋: {query} ({time_instruction}, {num_instruction}, 語言: {language})")
         
-        # 建立語言相關的搜尋關鍵字
-        language_keywords = {
-            "English": "in English",
-            "Chinese": "中文 OR 華語 OR Chinese",
-            "Vietnamese": "tiếng Việt OR Vietnamese",
-            "Thai": "ภาษาไทย OR Thai",
-            "Malay": "Bahasa Melayu OR Malay",
-            "Indonesian": "Bahasa Indonesia OR Indonesian"
+        # 建立語言與國家映射
+        language_config = {
+            "English": {"keywords": "in English", "countries": ["Singapore", "Malaysia", "Thailand", "Vietnam", "Philippines"]},
+            "Chinese": {"keywords": "中文 華語 Chinese", "countries": ["Singapore", "Malaysia"]},
+            "Vietnamese": {"keywords": "tiếng Việt Vietnamese", "countries": ["Vietnam"]},
+            "Thai": {"keywords": "ภาษาไทย Thai", "countries": ["Thailand"]},
+            "Malay": {"keywords": "Bahasa Melayu Malay", "countries": ["Malaysia"]},
+            "Indonesian": {"keywords": "Bahasa Indonesia Indonesian", "countries": ["Indonesia"]}
         }
         
-        language_hint = language_keywords.get(language, "in English")
+        lang_info = language_config.get(language, language_config["English"])
+        language_keywords = lang_info["keywords"]
+        target_countries = ", ".join(lang_info["countries"])
         
         # 生成可信來源列表
         sources_list = "\n".join([
@@ -84,85 +86,47 @@ class ResearchAgent:
         allowed_domains = [src['domain'] for src in self.TRUSTED_NEWS_SOURCES]
         allowed_domains_str = ", ".join(allowed_domains)
         
-        # 強化搜尋提示詞，要求以 JSON 格式返回結果
+        # 精簡優化的搜尋提示詞
         enhanced_query = f"""
-        請扮演一位頂尖的金融研究員，深入搜尋關於「{query}」的東南亞金融新聞。
+你是東南亞金融研究專家。搜尋主題：「{query}」
 
-        **核心任務指令:**
-        1.  **搜尋範圍**: 嚴格鎖定東南亞國家（新加坡、馬來西亞、泰國、印尼、越南、菲律賓、柬埔寨）。
-        2.  **時間要求**: 嚴格篩選在 **{time_instruction}** 內發布的新聞。
-        3.  **數量要求**: 你的目標是找到並提供 **{num_instruction}** 的高品質新聞。你必須盡力達成這個數量目標。
-        4.  **語言要求**: 請優先搜尋 **{language}** 語言的新聞來源。在搜尋時加上關鍵字：{language_hint}
+【核心要求】
+- 地區：{target_countries}（東南亞國家）
+- 時間：{time_instruction}
+- 數量：{num_instruction}
+- 來源：{allowed_domains_str}
 
-        5.  **來源建議**: 優先從以下可信新聞網站搜尋新聞：
+【語言與查詢策略】
+- 目標語言：{language}
+- 步驟1：先用 {language} 生成 5-8 組多樣化關鍵詞（含同義詞、在地用詞、縮寫）
+- 步驟2：用這些關鍵詞執行多輪搜尋，關鍵字提示：{language_keywords}
+- 步驟3：優先回傳 {language} 頁面；不足時補充英文來源並標註語言
 
-{sources_list}
+【搜尋策略】
+1. 對不同域名進行搜尋，確保來源多樣性（至少 3 個不同網站）
+2. 使用多組關鍵詞變化（同義詞、中英文混搭）
+3. 每則新聞需包含：標題、摘要（100-300字）、來源、URL、日期（YYYY-MM-DD）
 
-        6.  **搜尋技巧 - 強制多樣性策略（非常重要）**:
+【輸出格式】
+回傳 JSON（用 ```json 包裹）：
+```json
+{{
+  "search_query": "{query}",
+  "search_date": "{datetime.now().strftime('%Y-%m-%d')}",
+  "results": [
+    {{
+      "title": "新聞標題（原文）",
+      "summary": "100-300字摘要，包含主要資訊與數據",
+      "source": "來源名稱",
+      "url": "https://...",
+      "date": "YYYY-MM-DD",
+      "language": "{language}"
+    }}
+  ]
+}}
+```
 
-            ⚠️ **必須遵守**: 為了確保新聞來源的多樣性，你**必須**對多個不同網站進行**獨立搜尋**。
-
-            **推薦策略 - 分區域獨立搜尋**:
-
-            a) 🇻🇳 **越南區域** (至少搜尋 2-3 個網站):
-               - 越南的金融科技、銀行、投資相關新聞
-
-            b) 🇹🇭 **泰國區域** (至少搜尋 1-2 個網站):
-               - 泰國的金融科技、銀行、投資相關新聞
-
-            c) 🇸🇬 **新加坡/區域媒體** (至少搜尋 2-3 個網站):
-               - 新加坡和東南亞區域的金融科技、銀行、投資相關新聞
-
-            d) 🇵🇭 **菲律賓區域**:
-               - 菲律賓的金融科技、銀行、投資相關新聞
-
-            e) 🇰🇭 **柬埔寨區域**:
-               - 柬埔寨的金融科技、銀行、投資相關新聞
-
-        7.  **多樣性建議**:
-            - 💡 **建議做法**: 盡量使用 3-4 個或以上不同的新聞來源
-            - 🔄 **執行方式**: 對不同區域進行搜尋，嘗試從多個網站收集新聞
-            - 📊 **平衡策略**: 優先選擇最相關和高質量的新聞，同時適度考慮來源多樣性
-            - 使用不同的關鍵字變化（中英文、同義詞等）
-
-        8.  **域名建議**:
-            - 優先使用以下網站：{allowed_domains_str}
-            - 但不限於這些網站，也可以使用其他可信的東南亞金融新聞來源
-
-        9.  **資訊完整性**: 每條新聞都必須包含清晰的「標題」、「摘要」、「來源網站」、「完整網址」和「發布日期」。
-
-        **輸出格式要求（非常重要）:**
-        你**必須嚴格**遵循下面的 JSON 格式返回結果。請在你的回應中包含一個 JSON 代碼塊（用 ```json 包裹）。
-
-        ```json
-        {{
-            "search_query": "{query}",
-            "search_date": "{datetime.now().strftime('%Y-%m-%d')}",
-            "results": [
-                {{
-                    "title": "新聞標題（英文或原文）",
-                    "summary": "這是新聞的詳細摘要內容，應該包含新聞的主要資訊、數據和關鍵事件...",
-                    "source": "新聞來源名稱",
-                    "url": "https://example.com/news-article-1",
-                    "date": "YYYY-MM-DD"
-                }},
-                {{
-                    "title": "新聞標題（英文或原文）",
-                    "summary": "這是新聞的詳細摘要內容，應該包含新聞的主要資訊、數據和關鍵事件...",
-                    "source": "新聞來源名稱",
-                    "url": "https://example.com/news-article-2",
-                    "date": "YYYY-MM-DD"
-                }}
-            ]
-        }}
-        ```
-
-        **請務必:**
-        1. 使用 ```json 和 ``` 包裹你的 JSON 回應
-        2. 確保 JSON 格式正確（有效的 JSON 語法）
-        3. 每條新聞都必須包含所有必要欄位（title, summary, source, url, date）
-        4. summary 應該詳細且資訊豐富（至少 100-200 字）
-        5. 日期格式必須為 YYYY-MM-DD
+注意：確保 JSON 語法正確、所有欄位完整、日期在指定範圍內。
         """
         
         try:
