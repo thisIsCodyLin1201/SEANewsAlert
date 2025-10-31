@@ -130,50 +130,101 @@ class ResearchAgent:
         """
         
         try:
-            # 使用 OpenAI Responses API 執行網路搜尋
-            response = self.client.responses.create(
+            # 使用 OpenAI Responses API 執行網路搜尋（串流模式）
+            print("🌐 正在啟動串流搜尋...")
+            
+            stream = self.client.responses.create(
                 model=self.model,
                 input=enhanced_query,
                 tools=[
                     {
                         "type": "web_search"
                     }
-                ]
+                ],
+                stream=True  # 啟用串流模式
             )
 
             # 提取回應內容和來源
             content = ""
             sources = []
+            web_search_count = 0
+            text_chunks = 0
 
-            for output_item in response.output:
-                if output_item.type == "web_search_call":
-                    print(f"🔍 網路搜尋狀態: {output_item.status}")
-
-                elif output_item.type == "message":
-                    # 提取文本內容
-                    for content_item in output_item.content:
-                        if content_item.type == "output_text":
-                            content += content_item.text
-
-                            # 處理引用/來源資訊
-                            if hasattr(content_item, 'annotations') and content_item.annotations:
-                                for annotation in content_item.annotations:
-                                    if annotation.type == "url_citation":
-                                        sources.append({
-                                            "title": annotation.title,
-                                            "url": annotation.url,
-                                            "index": annotation.index if hasattr(annotation, 'index') else None
-                                        })
+            # 串流接收事件
+            print("📡 開始接收串流事件...")
+            for event in stream:
+                event_type = event.type
+                
+                # 回應創建事件
+                if event_type == "response.created":
+                    print(f"📡 回應已創建 (ID: {event.response.id})")
+                
+                # 工具呼叫開始
+                elif event_type == "response.output_item.added":
+                    output_item = event.item
+                    if hasattr(output_item, 'type') and output_item.type == "web_search_call":
+                        web_search_count += 1
+                        print(f"🔍 開始第 {web_search_count} 次網路搜尋...")
+                
+                # 工具呼叫完成
+                elif event_type == "response.output_item.done":
+                    output_item = event.item
+                    if hasattr(output_item, 'type') and output_item.type == "web_search_call":
+                        status = getattr(output_item, 'status', 'unknown')
+                        print(f"✅ 網路搜尋完成 (狀態: {status})")
+                
+                # 文字內容片段（逐步接收）
+                elif event_type == "response.content_part.delta":
+                    delta = event.delta
+                    if hasattr(delta, 'text') and delta.text:
+                        content += delta.text
+                        text_chunks += 1
+                        # 每接收 10 個片段顯示一次進度
+                        if text_chunks % 10 == 0:
+                            print(f"📝 已接收 {len(content)} 字元... ({text_chunks} 個片段)")
+                
+                # 內容片段完成（包含 annotations）
+                elif event_type == "response.content_part.done":
+                    # 正確的屬性名稱是 part，不是 content_part
+                    content_part = event.part
+                    if hasattr(content_part, 'text'):
+                        # 確保完整文字被加入
+                        if content_part.text and content_part.text not in content:
+                            content += content_part.text
+                    
+                    # 處理引用/來源資訊
+                    if hasattr(content_part, 'annotations') and content_part.annotations:
+                        for annotation in content_part.annotations:
+                            if annotation.type == "url_citation":
+                                source_info = {
+                                    "title": annotation.title,
+                                    "url": annotation.url,
+                                    "index": annotation.index if hasattr(annotation, 'index') else None
+                                }
+                                sources.append(source_info)
+                                print(f"📌 找到來源: {annotation.title[:50]}...")
+                
+                # 回應完成
+                elif event_type == "response.done":
+                    print("🎉 串流接收完成")
+                
+                # 錯誤事件
+                elif event_type == "error":
+                    error_data = event.error
+                    print(f"❌ 串流錯誤: {error_data}")
+                    raise Exception(f"串流錯誤: {error_data}")
 
             print("✅ Research Agent 搜尋完成")
             print(f"📰 找到 {len(sources)} 個來源")
+            print(f"📄 總文字長度: {len(content)} 字元")
+            print(f"🔍 執行了 {web_search_count} 次網路搜尋")
 
             return {
                 "status": "success",
                 "query": query,
                 "content": content,
                 "sources": sources,
-                "raw_response": response
+                "web_search_count": web_search_count
             }
 
         except Exception as e:
